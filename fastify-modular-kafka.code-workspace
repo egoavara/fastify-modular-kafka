@@ -1,0 +1,20 @@
+{
+	"folders": [
+		{
+			"path": "./src",
+			"name": "[source]"
+		},
+		{
+			"path": "./test",
+			"name": "[test]"
+		},
+		{
+			"path": ".",
+			"name": "[root]"
+		}
+	],
+	"settings": {
+		"typescript.preferences.importModuleSpecifierEnding": "js",
+		"typescript.tsdk": "[root]/node_modules/typescript/lib",
+	}
+}
