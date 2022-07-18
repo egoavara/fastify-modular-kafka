@@ -1,7 +1,9 @@
-import { DEFAULT_SHARE_GROUP, FastifyModular, ObjectError, ShareManager, SHARE_MANAGER } from "fastify-modular"
 import { intoRegexTopic, Share } from "@fastify-modular/route"
+import { DEFAULT_SHARE_GROUP, FastifyModular, ObjectError, ShareManager, SHARE_MANAGER } from "fastify-modular"
 import { Consumer, ConsumerConfig, ConsumerRunConfig, ConsumerSubscribeTopics, Kafka, KafkaConfig, ProducerConfig } from "kafkajs"
-const DEFAULT_GROUP_ID = "DEFAULT_GROUP_ID(@fastify-modular/kafka)"
+
+const DEFAULT_GROUP_ID = "@fastify-modular/kafka"
+
 export type KafkaModuleGroupOption = {
     consumer?: Omit<ConsumerConfig, 'groupId'>,
     run?: Omit<ConsumerRunConfig, 'eachMessage' | 'eachBatch'>,
@@ -11,13 +13,14 @@ export type KafkaModuleGroupOption = {
 export type KafkaModuleOption = {
     kafka: KafkaConfig,
     producer: ProducerConfig
-    defaultId: string,
     default: KafkaModuleGroupOption
     groups?: Record<string, KafkaModuleGroupOption>
 }
+
 type InternalShareManager = {
     stop(): Promise<void>
 }
+
 function realTopicName(share: Share<any, any, any, any, any>, params: unknown) {
     let topic = share.topic as string
     if (typeof params === 'object' && params !== null) {
@@ -46,13 +49,13 @@ export const KafkaModule = FastifyModular('kafka')
     .static('kafka', 'auto', async ({ }, option) => {
         return new Kafka(option.kafka)
     })
-    .do(async ({ kafka }, option, { fastify, instance }) => {
+    .do(async (ctx, option, { fastify, instance }) => {
         let initialized = false
         // 
-        const producer = kafka.producer(option.producer)
+        const producer = ctx.kafka.producer(option.producer)
         // 
+        const groupOptions: Record<string, KafkaModuleGroupOption> = { [DEFAULT_GROUP_ID]: option.default, ...(option.groups ?? {}) }
         let consumers: Record<string, Consumer> = {}
-        let groupOptions = { [option.defaultId]: option.default, ...(option.groups ?? {}) }
         let groupTopics: Record<string, (string | RegExp)[]> = {}
         let regexMapping: { gregex: RegExp, path: string }[] = []
         // 
@@ -75,19 +78,22 @@ export const KafkaModule = FastifyModular('kafka')
                 if (initialized) {
                     await this.stop()
                 }
+                initialized = true
                 // =====
                 consumers = {}
-                groupOptions = {}
                 groupTopics = {}
                 regexMapping = []
                 for (const { define: route, option: routeOption } of [...(kafkaManager ? fastify[SHARE_MANAGER]['kafka'].route : []), ...(defaultManager ? fastify[SHARE_MANAGER][DEFAULT_SHARE_GROUP].route : [])]) {
-                    const gid = routeOption.groupId ?? DEFAULT_GROUP_ID
+                    const gid = defaultManager ? routeOption.groupId ?? DEFAULT_GROUP_ID : routeOption.groupId
+                    if (gid === undefined) {
+                        continue
+                    }
                     if (!(gid in groupOptions)) {
                         groupOptions[gid] = option.default
                         fastify.log.warn(`fastify-modular(kafka) : not have option for group id = '${gid}', it use default kafka consumer option`)
                     }
                     if (!(gid in consumers)) {
-                        consumers[gid] = kafka.consumer({
+                        consumers[gid] = ctx.kafka.consumer({
                             ...(groupOptions[gid].consumer ?? {}),
                             groupId: gid
                         })
@@ -130,6 +136,7 @@ export const KafkaModule = FastifyModular('kafka')
                                 const response = await fastify.inject({
                                     method: "PATCH",
                                     path: path,
+                                    headers: { 'content-type': 'application/json' },
                                     payload: JSON.stringify({
                                         topic: payload.topic,
                                         payload: message === undefined ? undefined : JSON.parse(message),
@@ -138,8 +145,8 @@ export const KafkaModule = FastifyModular('kafka')
                                         key: payload.message.key?.toString()
                                     })
                                 })
-                                if (response.statusCode === 500) {
-                                    throw new ObjectError(JSON.parse(response.body))
+                                if (response.statusCode !== 204) {
+                                    throw new ObjectError({})
                                 }
                                 // 
                                 break
@@ -161,10 +168,13 @@ export const KafkaModule = FastifyModular('kafka')
         if (fastify[SHARE_MANAGER][DEFAULT_SHARE_GROUP].manager === undefined) { fastify[SHARE_MANAGER][DEFAULT_SHARE_GROUP].manager = manager; defaultManager = true }
         if (fastify[SHARE_MANAGER]['kafka'] === undefined) { fastify[SHARE_MANAGER]['kafka'] = { route: [], } }
         if (fastify[SHARE_MANAGER]['kafka'].manager === undefined) { fastify[SHARE_MANAGER]['kafka'].manager = manager; kafkaManager = true }
+        //
+        let reload = Promise.resolve()
         fastify.addHook("onReady", async function () {
-            await manager.reload()
+            reload = manager.reload()
         })
         fastify.addHook("onClose", async (fastify) => {
+            await reload
             await manager.stop()
         })
     })
