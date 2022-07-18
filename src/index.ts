@@ -1,5 +1,5 @@
 import { DEFAULT_SHARE_GROUP, FastifyModular, ObjectError, ShareManager, SHARE_MANAGER } from "fastify-modular"
-import { intoRegexTopic, Share } from "fastify-modular-route"
+import { intoRegexTopic, Share } from "@fastify-modular/route"
 import { Consumer, ConsumerConfig, ConsumerRunConfig, ConsumerSubscribeTopics, Kafka, KafkaConfig, ProducerConfig } from "kafkajs"
 const DEFAULT_GROUP_ID = "DEFAULT_GROUP_ID(@fastify-modular/kafka)"
 export type KafkaModuleGroupOption = {
@@ -80,7 +80,7 @@ export const KafkaModule = FastifyModular('kafka')
                 groupOptions = {}
                 groupTopics = {}
                 regexMapping = []
-                for (const { define: route, option:routeOption } of [...(kafkaManager ? fastify[SHARE_MANAGER]['kafka'].route : []), ...(defaultManager ? fastify[SHARE_MANAGER][DEFAULT_SHARE_GROUP].route : [])]) {
+                for (const { define: route, option: routeOption } of [...(kafkaManager ? fastify[SHARE_MANAGER]['kafka'].route : []), ...(defaultManager ? fastify[SHARE_MANAGER][DEFAULT_SHARE_GROUP].route : [])]) {
                     const gid = routeOption.groupId ?? DEFAULT_GROUP_ID
                     if (!(gid in groupOptions)) {
                         groupOptions[gid] = option.default
