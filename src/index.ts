@@ -4,6 +4,8 @@ import { Consumer, ConsumerConfig, ConsumerRunConfig, ConsumerSubscribeTopics, K
 
 const DEFAULT_GROUP_ID = "@fastify-modular/kafka"
 
+export type KafkaClient = Pick<Kafka, keyof Kafka>
+
 export type KafkaModuleGroupOption = {
     consumer?: Omit<ConsumerConfig, 'groupId'>,
     run?: Omit<ConsumerRunConfig, 'eachMessage' | 'eachBatch'>,

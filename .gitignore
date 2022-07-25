@@ -143,3 +143,6 @@ esm/*.tsbuildinfo
 types/**/*.d.ts
 types/**/*.d.ts.map
 types/*.tsbuildinfo
+
+# macOS
+.DS_Store

@@ -5,9 +5,9 @@ specifiers:
   '@types/node': ^18.0.5
   '@types/tap': ^15.0.7
   fastify: ^4.2.0
-  fastify-modular: ^0.8.5
+  fastify-modular: ^0.8.9
   kafkajs: ^2.1.0
-  pito: ^0.4.2
+  pito: ^0.5.1
   rimraf: ^3.0.2
   tap: ^16.3.0
   ts-node: ^10.9.1
@@ -17,12 +17,12 @@ dependencies:
   kafkajs: 2.1.0
 
 devDependencies:
-  '@fastify-modular/route': 0.8.1_pito@0.4.2
+  '@fastify-modular/route': 0.8.1_pito@0.5.1
   '@types/node': 18.0.5
   '@types/tap': 15.0.7
   fastify: 4.2.1
-  fastify-modular: 0.8.5_tmhgjq4ujbv6womx7xzrk3hf24
-  pito: 0.4.2
+  fastify-modular: 0.8.9_igpxtcmyxffbfsjybsykr4uooy
+  pito: 0.5.1
   rimraf: 3.0.2
   tap: 16.3.0_6oasmw356qmm23djlsjgkwvrtm
   ts-node: 10.9.1_47blntjhuqtdxyxfczkfdvsynq
@@ -232,12 +232,12 @@ packages:
       '@jridgewell/trace-mapping': 0.3.9
     dev: true
 
-  /@fastify-modular/route/0.8.1_pito@0.4.2:
+  /@fastify-modular/route/0.8.1_pito@0.5.1:
     resolution: {integrity: sha512-3rqwg+nDRJWi3SbNbQufrSNEs9rxh1bZASq6EXRDkyb68Df8192ZkfPmL0emT0RJmfQccN0B1kX53644K5oLKQ==}
     peerDependencies:
       pito: ^0.4.2
     dependencies:
-      pito: 0.4.2
+      pito: 0.5.1
     dev: true
 
   /@fastify/ajv-compiler/3.1.2:
@@ -776,14 +776,14 @@ packages:
     resolution: {integrity: sha512-qKRta6N7BWEFVlyonVY/V+BMLgFqktCUV0QjT259ekAIlbVrMaFnFLxJ4s/JPl4tou56S1BzPufI60bLe29fHA==}
     dev: true
 
-  /fastify-modular/0.8.5_tmhgjq4ujbv6womx7xzrk3hf24:
-    resolution: {integrity: sha512-yuGxYmb00Q2JnvZp8H6fSncGBSQcjHkft6lN7y0MJzIUMRnbPkIgG/87r0xVj5VenwvyIgXlegjVHrDLSZk0ZQ==}
+  /fastify-modular/0.8.9_igpxtcmyxffbfsjybsykr4uooy:
+    resolution: {integrity: sha512-SioV/6yPWEoWAayY6KjzyMAz2QqDMoMoEx48YgQjV2CJGFJX0vnjkt2O4y1FrGgswFiRFY5rOmSF/qj6CCVGyg==}
     peerDependencies:
-      '@fastify-modular/route': ^0.8.1
+      '@fastify-modular/route': ~0.8.1
       fastify: ^4.0.0
-      pito: ^0.4.2
+      pito: ~0.5.0
     dependencies:
-      '@fastify-modular/route': 0.8.1_pito@0.4.2
+      '@fastify-modular/route': 0.8.1_pito@0.5.1
       '@fastify/busboy': 1.1.0
       '@fastify/multipart': 7.1.0
       '@fastify/websocket': 6.0.1
@@ -791,7 +791,7 @@ packages:
       fastify: 4.2.1
       fastify-plugin: 4.0.0
       glob: 8.0.3
-      pito: 0.4.2
+      pito: 0.5.1
       uuid: 8.3.2
     transitivePeerDependencies:
       - bufferutil
@@ -1414,8 +1414,8 @@ packages:
       thread-stream: 1.0.1
     dev: true
 
-  /pito/0.4.2:
-    resolution: {integrity: sha512-ejj5CWp+WRHOCH4d7sA0vcZPTLvJ0Lmoitnv9UB+HMjXe3z9oCEMc9N321jznWQJAB4OkAiX8tNzjM/bnOQ/XQ==}
+  /pito/0.5.1:
+    resolution: {integrity: sha512-25n57E4i+V9CsWp8C6eDRSRE1d7UPkoAqTHdMoCJ5tDsrO6lBziPmq2gujZEcPeYnWwCaJUpNeL/dRFf7ShiFQ==}
     dev: true
 
   /pkg-dir/4.2.0:
