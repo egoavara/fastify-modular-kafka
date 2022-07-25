@@ -4,8 +4,6 @@ import { Consumer, ConsumerConfig, ConsumerRunConfig, ConsumerSubscribeTopics, K
 
 const DEFAULT_GROUP_ID = "@fastify-modular/kafka"
 
-export type KafkaClient = Pick<Kafka, keyof Kafka>
-
 export type KafkaModuleGroupOption = {
     consumer?: Omit<ConsumerConfig, 'groupId'>,
     run?: Omit<ConsumerRunConfig, 'eachMessage' | 'eachBatch'>,
@@ -49,7 +47,7 @@ function realTopicName(share: Share<any, any, any, any, any>, params: unknown) {
 export const KafkaModule = FastifyModular('kafka')
     .option<KafkaModuleOption>()
     .static('kafka', 'auto', async ({ }, option) => {
-        return new Kafka(option.kafka)
+        return new Kafka(option.kafka) as Pick<Kafka, keyof Kafka>
     })
     .do(async (ctx, option, { fastify, instance }) => {
         let initialized = false
