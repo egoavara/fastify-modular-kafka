@@ -1,6 +1,6 @@
 {
   "name": "@fastify-modular/kafka",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "",
   "type": "module",
   "types": "./types/index.d.ts",
@@ -34,8 +34,7 @@
   ],
   "author": "egoavara",
   "license": "MIT",
-  "dependencies": {
-  },
+  "dependencies": {},
   "devDependencies": {
     "@fastify-modular/route": "^0.8.1",
     "@types/node": "^18.0.5",
