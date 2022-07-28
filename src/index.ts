@@ -1,18 +1,34 @@
 import { intoRegexTopic, Share } from "@fastify-modular/route"
 import { DEFAULT_SHARE_GROUP, FastifyModular, ObjectError, ShareManager, SHARE_MANAGER } from "fastify-modular"
-import KafkaJS from "kafkajs"
+import type {
+    Consumer as _Consumer, ConsumerConfig as _ConsumerConfig,
+    ConsumerRunConfig as _ConsumerRunConfig,
+    ConsumerSubscribeTopics as _ConsumerSubscribeTopics,
+    KafkaConfig as _KafkaConfig, Producer as _Producer, ProducerConfig as _ProducerConfig, Transaction as _Transaction
+} from "kafkajs"
+import { Kafka as _Kafka } from "kafkajs"
 
 const DEFAULT_GROUP_ID = "@fastify-modular/kafka"
 
+export type Kafka = Pick<_Kafka, keyof _Kafka>
+export type Producer = Pick<_Producer, keyof _Producer>
+export type Consumer = Pick<_Consumer, keyof _Consumer>
+export type Transaction = Pick<_Transaction, keyof _Transaction>
+export type ConsumerConfig = Pick<_ConsumerConfig, keyof _ConsumerConfig>
+export type ConsumerRunConfig = Pick<_ConsumerRunConfig, keyof _ConsumerRunConfig>
+export type ConsumerSubscribeTopics = Pick<_ConsumerSubscribeTopics, keyof _ConsumerSubscribeTopics>
+export type KafkaConfig = Pick<_KafkaConfig, keyof _KafkaConfig>
+export type ProducerConfig = Pick<_ProducerConfig, keyof _ProducerConfig>
+
 export type KafkaModuleGroupOption = {
-    consumer?: Omit<KafkaJS.ConsumerConfig, 'groupId'>,
-    run?: Omit<KafkaJS.ConsumerRunConfig, 'eachMessage' | 'eachBatch'>,
-    subscribe?: Omit<KafkaJS.ConsumerSubscribeTopics, 'topics'>
+    consumer?: Omit<ConsumerConfig, 'groupId'>,
+    run?: Omit<ConsumerRunConfig, 'eachMessage' | 'eachBatch'>,
+    subscribe?: Omit<ConsumerSubscribeTopics, 'topics'>
 }
 
 export type KafkaModuleOption = {
-    kafka: KafkaJS.KafkaConfig,
-    producer: KafkaJS.ProducerConfig
+    kafka: KafkaConfig,
+    producer: ProducerConfig
     default: KafkaModuleGroupOption
     groups?: Record<string, KafkaModuleGroupOption>
 }
@@ -43,25 +59,30 @@ function realTopicName(share: Share<any, any, any, any, any>, params: unknown) {
     }
     return topic
 }
-
 export const KafkaModule = FastifyModular('kafka')
     .option<KafkaModuleOption>()
-    .static('kafka', 'auto', async ({ }, option) => {
-        return new KafkaJS.Kafka(option.kafka)
+    .static('kafka', 'auto', async ({ }, option): Promise<Kafka> => {
+        return new _Kafka(option.kafka)
     })
     .static('kafkaValue', 'auto', async ({ kafka }, option) => {
         return {
             producer: kafka.producer(option.producer),
-            groupOptions: { [DEFAULT_GROUP_ID]: option.default, ...(option.groups ?? {}) } as Record<typeof DEFAULT_GROUP_ID, KafkaModuleGroupOption> & Record<string, KafkaModuleGroupOption>,
-            consumers: {} as Record<string, KafkaJS.Consumer>,
+            groupOptions: { [DEFAULT_GROUP_ID]: option.default, ...(option.groups ?? {}) },
+            consumers: {} as Record<string, Consumer>,
             groupTopics: {} as Record<string, (string | RegExp)[]>,
             regexMapping: [] as { gregex: RegExp, path: string }[]
+        } as {
+            producer: Producer
+            groupOptions: Record<typeof DEFAULT_GROUP_ID, KafkaModuleGroupOption> & Record<string, KafkaModuleGroupOption>
+            consumers: Record<string, Consumer>,
+            groupTopics: Record<string, (string | RegExp)[]>,
+            regexMapping: { gregex: RegExp, path: string }[],
         }
     })
     .dynamic("txKafka",
         async ({ kafkaValue, kafka }) => {
             await kafkaValue.producer.connect()
-            return await kafkaValue.producer.transaction()
+            return await kafkaValue.producer.transaction() as Transaction
         },
         async ({ value, catched },) => {
             if (catched === undefined) {
