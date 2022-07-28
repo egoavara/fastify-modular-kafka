@@ -1,20 +1,18 @@
 import { intoRegexTopic, Share } from "@fastify-modular/route"
 import { DEFAULT_SHARE_GROUP, FastifyModular, ObjectError, ShareManager, SHARE_MANAGER } from "fastify-modular"
-import { Consumer, ConsumerConfig, ConsumerRunConfig, ConsumerSubscribeTopics, Kafka, KafkaConfig, ProducerConfig } from "kafkajs"
+import KafkaJS from "kafkajs"
 
 const DEFAULT_GROUP_ID = "@fastify-modular/kafka"
 
-export type KafkaClient = Pick<Kafka, keyof Kafka>
-
 export type KafkaModuleGroupOption = {
-    consumer?: Omit<ConsumerConfig, 'groupId'>,
-    run?: Omit<ConsumerRunConfig, 'eachMessage' | 'eachBatch'>,
-    subscribe?: Omit<ConsumerSubscribeTopics, 'topics'>
+    consumer?: Omit<KafkaJS.ConsumerConfig, 'groupId'>,
+    run?: Omit<KafkaJS.ConsumerRunConfig, 'eachMessage' | 'eachBatch'>,
+    subscribe?: Omit<KafkaJS.ConsumerSubscribeTopics, 'topics'>
 }
 
 export type KafkaModuleOption = {
-    kafka: KafkaConfig,
-    producer: ProducerConfig
+    kafka: KafkaJS.KafkaConfig,
+    producer: KafkaJS.ProducerConfig
     default: KafkaModuleGroupOption
     groups?: Record<string, KafkaModuleGroupOption>
 }
@@ -49,18 +47,32 @@ function realTopicName(share: Share<any, any, any, any, any>, params: unknown) {
 export const KafkaModule = FastifyModular('kafka')
     .option<KafkaModuleOption>()
     .static('kafka', 'auto', async ({ }, option) => {
-        return new Kafka(option.kafka) as KafkaClient
+        return new KafkaJS.Kafka(option.kafka)
     })
-    .do(async (ctx, option, { fastify, instance }) => {
+    .static('kafkaValue', 'auto', async ({ kafka }, option) => {
+        return {
+            producer: kafka.producer(option.producer),
+            groupOptions: { [DEFAULT_GROUP_ID]: option.default, ...(option.groups ?? {}) } as Record<typeof DEFAULT_GROUP_ID, KafkaModuleGroupOption> & Record<string, KafkaModuleGroupOption>,
+            consumers: {} as Record<string, KafkaJS.Consumer>,
+            groupTopics: {} as Record<string, (string | RegExp)[]>,
+            regexMapping: [] as { gregex: RegExp, path: string }[]
+        }
+    })
+    .dynamic("txKafka",
+        async ({ kafkaValue, kafka }) => {
+            await kafkaValue.producer.connect()
+            return await kafkaValue.producer.transaction()
+        },
+        async ({ value, catched },) => {
+            if (catched === undefined) {
+                await value.commit()
+            } else {
+                await value.abort()
+            }
+        }
+    )
+    .do(async ({ kafkaValue, kafka }, option, { fastify, instance }) => {
         let initialized = false
-        // 
-        const producer = ctx.kafka.producer(option.producer)
-        // 
-        const groupOptions: Record<string, KafkaModuleGroupOption> = { [DEFAULT_GROUP_ID]: option.default, ...(option.groups ?? {}) }
-        let consumers: Record<string, Consumer> = {}
-        let groupTopics: Record<string, (string | RegExp)[]> = {}
-        let regexMapping: { gregex: RegExp, path: string }[] = []
-        // 
         let defaultManager = false
         let kafkaManager = false
         // 
@@ -68,7 +80,7 @@ export const KafkaModule = FastifyModular('kafka')
             instance,
             async publish(route, args) {
                 const realTopic = realTopicName(route, args.params)
-                await producer.send({
+                await kafkaValue.producer.send({
                     topic: realTopic,
                     messages: [
                         { value: JSON.stringify(args.payload), key: args.key, headers: args.headers }
@@ -82,54 +94,56 @@ export const KafkaModule = FastifyModular('kafka')
                 }
                 initialized = true
                 // =====
-                consumers = {}
-                groupTopics = {}
-                regexMapping = []
+                kafkaValue.consumers = {}
+                kafkaValue.groupTopics = {}
+                kafkaValue.regexMapping = []
                 for (const { define: route, option: routeOption } of [...(kafkaManager ? fastify[SHARE_MANAGER]['kafka'].route : []), ...(defaultManager ? fastify[SHARE_MANAGER][DEFAULT_SHARE_GROUP].route : [])]) {
                     const gid = defaultManager ? routeOption.groupId ?? DEFAULT_GROUP_ID : routeOption.groupId
                     if (gid === undefined) {
                         continue
                     }
-                    if (!(gid in groupOptions)) {
-                        groupOptions[gid] = option.default
+                    if (!(gid in kafkaValue.groupOptions)) {
+                        kafkaValue.groupOptions[gid] = option.default
                         fastify.log.warn(`fastify-modular(kafka) : not have option for group id = '${gid}', it use default kafka consumer option`)
                     }
-                    if (!(gid in consumers)) {
-                        consumers[gid] = ctx.kafka.consumer({
-                            ...(groupOptions[gid].consumer ?? {}),
+                    if (!(gid in kafkaValue.consumers)) {
+                        kafkaValue.consumers[gid] = kafka.consumer({
+                            ...(kafkaValue.groupOptions[gid].consumer ?? {}),
                             groupId: gid
                         })
                     }
-                    if (!(gid in groupTopics)) {
-                        groupTopics[gid] = []
+                    if (!(gid in kafkaValue.groupTopics)) {
+                        kafkaValue.groupTopics[gid] = []
                     }
                     if (route.topic.search(':') === -1) {
-                        groupTopics[gid].push(route.topic)
-                        regexMapping.push({
+                        kafkaValue.groupTopics[gid].push(route.topic)
+                        kafkaValue.regexMapping.push({
                             gregex: intoRegexTopic(route.topic, { namedRegex: true }),
                             path: route.path.replace(":", "_")
                         })
                     } else {
                         const regexNongroups = intoRegexTopic(route.topic, { namedRegex: false })
-                        groupTopics[gid].push(regexNongroups)
-                        regexMapping.push({
+                        kafkaValue.groupTopics[gid].push(regexNongroups)
+                        kafkaValue.regexMapping.push({
                             gregex: intoRegexTopic(route.topic, { namedRegex: true }),
                             path: route.path.replace(":", "_")
                         })
                     }
                 }
                 // =====
-                await producer.connect()
-                await Promise.all(Object.values(consumers).map(v => v.connect()))
-                await Promise.all(Object.entries(consumers).map(([gid, v]) => {
-                    return v.subscribe({ topics: groupTopics[gid], ...(groupOptions[gid].subscribe) })
+                await kafkaValue.producer.connect()
+                await Promise.all(Object.values(kafkaValue.consumers).map(async v => {
+                    await v.connect()
                 }))
-                await Promise.all(Object.entries(consumers).map(([gid, v]) => {
+                await Promise.all(Object.entries(kafkaValue.consumers).map(([gid, v]) => {
+                    return v.subscribe({ topics: kafkaValue.groupTopics[gid], ...(kafkaValue.groupOptions[gid].subscribe) })
+                }))
+                await Promise.all(Object.entries(kafkaValue.consumers).map(([gid, v]) => {
                     return v.run({
-                        ...(groupOptions[gid].run),
+                        ...(kafkaValue.groupOptions[gid].run),
                         async eachMessage(payload) {
                             const message = payload.message.value?.toString()
-                            for (const { gregex, path } of regexMapping) {
+                            for (const { gregex, path } of kafkaValue.regexMapping) {
                                 const matched = payload.topic.match(gregex)
                                 if (matched === null) {
                                     continue
@@ -160,8 +174,8 @@ export const KafkaModule = FastifyModular('kafka')
             },
             async stop() {
                 if (initialized) {
-                    await producer.disconnect()
-                    await Promise.all(Object.values(consumers).map(v => v.disconnect()))
+                    await kafkaValue.producer.disconnect()
+                    await Promise.all(Object.values(kafkaValue.consumers).map(v => v.disconnect()))
                 }
                 initialized = false
             }
