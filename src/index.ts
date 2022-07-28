@@ -74,7 +74,7 @@ export const KafkaModule = FastifyModular('kafka')
             regexMapping: [] as { gregex: RegExp, path: string }[],
         }
     })
-    .dynamic("transaction:raw",
+    .dynamic("txKafka:raw",
         5000,
         async ({ "kafka:raw": kafkaRaw, kafka }) => {
             await kafka.producer.connect()
@@ -88,7 +88,7 @@ export const KafkaModule = FastifyModular('kafka')
             }
         }
     )
-    .dynamic("transaction", 5000, async ({ "transaction:raw": txRaw }) => {
+    .dynamic("txKafka", 5000, async ({ "txKafka:raw": txRaw }) => {
         const raw = await txRaw
         return {
             raw,
