@@ -1,37 +1,38 @@
 import { InferShare, intoRegexTopic, Share } from "@fastify-modular/route"
-import { pito } from "pito"
 import { DEFAULT_SHARE_GROUP, FastifyModular, ObjectError, ShareManager, SHARE_MANAGER } from "fastify-modular"
 import type {
-    Consumer as _Consumer, ConsumerConfig as _ConsumerConfig,
-    ConsumerRunConfig as _ConsumerRunConfig,
-    ConsumerSubscribeTopics as _ConsumerSubscribeTopics,
-    KafkaConfig as _KafkaConfig, Producer as _Producer, ProducerConfig as _ProducerConfig, Transaction as _Transaction
+    Consumer, ConsumerConfig,
+    ConsumerRunConfig,
+    ConsumerSubscribeTopics,
+    KafkaConfig, Producer, ProducerConfig, Transaction
 } from "kafkajs"
-import { Kafka as _Kafka } from "kafkajs"
+import { Kafka } from "kafkajs"
+import { pito } from "pito"
 
 const DEFAULT_GROUP_ID = "@fastify-modular/kafka"
 
-export type Kafka = Pick<_Kafka, keyof _Kafka>
-export type Producer = Pick<_Producer, keyof _Producer>
-export type Consumer = Pick<_Consumer, keyof _Consumer>
-export type Transaction = Pick<_Transaction, keyof _Transaction>
-export type ConsumerConfig = Pick<_ConsumerConfig, keyof _ConsumerConfig>
-export type ConsumerRunConfig = Pick<_ConsumerRunConfig, keyof _ConsumerRunConfig>
-export type ConsumerSubscribeTopics = Pick<_ConsumerSubscribeTopics, keyof _ConsumerSubscribeTopics>
-export type KafkaConfig = Pick<_KafkaConfig, keyof _KafkaConfig>
-export type ProducerConfig = Pick<_ProducerConfig, keyof _ProducerConfig>
 
 export type KafkaModuleGroupOption = {
-    consumer?: Omit<ConsumerConfig, 'groupId'>,
-    run?: Omit<ConsumerRunConfig, 'eachMessage' | 'eachBatch'>,
+    consumer?: Omit<ConsumerConfig, 'groupId'>
+    run?: Omit<ConsumerRunConfig, 'eachMessage' | 'eachBatch'>
     subscribe?: Omit<ConsumerSubscribeTopics, 'topics'>
 }
 
 export type KafkaModuleOption = {
-    kafka: KafkaConfig,
+    kafka: KafkaConfig
     producer: ProducerConfig
     default: KafkaModuleGroupOption
     groups?: Record<string, KafkaModuleGroupOption>
+}
+
+export type TxKafka = {
+    raw: Transaction
+    publish<Route extends Share<any, any, any, any, any>>(r: Route, args: {
+        params: pito.Type<InferShare<Route>['Params']>,
+        payload: pito.Type<InferShare<Route>['Payload']>,
+        headers?: Record<string, string | string[]>,
+        key?: string
+    }): Promise<void>;
 }
 
 type InternalShareManager = {
@@ -63,7 +64,7 @@ function realTopicName(share: Share<any, any, any, any, any>, params: unknown) {
 export const KafkaModule = FastifyModular('kafka')
     .option<KafkaModuleOption>()
     .static('kafka:raw', 'auto', async ({ }, option): Promise<Kafka> => {
-        return new _Kafka(option.kafka)
+        return new Kafka(option.kafka)
     })
     .static('kafka', 'auto', async ({ "kafka:raw": kafkaRaw }, option) => {
         return {
@@ -88,16 +89,11 @@ export const KafkaModule = FastifyModular('kafka')
             }
         }
     )
-    .dynamic("txKafka", 5000, async ({ "txKafka:raw": txRaw }) => {
+    .dynamic("txKafka", 5000, async ({ "txKafka:raw": txRaw }):Promise<TxKafka> => {
         const raw = await txRaw
         return {
             raw,
-            async publish<Route extends Share<any, any, any, any, any>>(r: Route, args: {
-                params: pito.Type<InferShare<Route>['Params']>,
-                payload: pito.Type<InferShare<Route>['Payload']>,
-                headers?: Record<string, string | string[]>,
-                key?: string
-            }): Promise<void> {
+            async publish(r, args) {
                 const realTopic = realTopicName(r, args.params)
                 await raw.send({
                     topic: realTopic,
