@@ -1,12 +1,7 @@
 import { InferShare, intoRegexTopic, Share } from "@fastify-modular/route"
 import { DEFAULT_SHARE_GROUP, FastifyModular, ObjectError, ShareManager, SHARE_MANAGER } from "fastify-modular"
-import type {
-    Consumer, ConsumerConfig,
-    ConsumerRunConfig,
-    ConsumerSubscribeTopics,
-    KafkaConfig, Producer, ProducerConfig, Transaction
-} from "kafkajs"
-import { Kafka } from "kafkajs"
+import type { Consumer, ConsumerConfig, ConsumerRunConfig, ConsumerSubscribeTopics, KafkaConfig, Message, Producer, ProducerConfig, Transaction } from "kafkajs"
+import { Kafka as KafkaJs } from "kafkajs"
 import { pito } from "pito"
 
 const DEFAULT_GROUP_ID = "@fastify-modular/kafka"
@@ -25,14 +20,24 @@ export type KafkaModuleOption = {
     groups?: Record<string, KafkaModuleGroupOption>
 }
 
+export type PublishArgs<Route extends Share<any, any, any, any, any>> = {
+    params: pito.Type<InferShare<Route>['Params']>,
+    payload: pito.Type<InferShare<Route>['Payload']>,
+    headers?: Record<string, string | string[]>,
+    key?: string
+}
+export type Kafka = {
+    producer: Producer,
+    groupOptions: Record<typeof DEFAULT_GROUP_ID, KafkaModuleGroupOption> & Record<string, KafkaModuleGroupOption>,
+    consumers: Record<string, Consumer>,
+    groupTopics: Record<string, (string | RegExp)[]>,
+    regexMapping: { gregex: RegExp, path: string }[],
+    publish<Route extends Share<any, any, any, any, any>>(r: Route, ...args: PublishArgs<Route>[]): Promise<void>
+
+}
 export type TxKafka = {
     raw: Transaction
-    publish<Route extends Share<any, any, any, any, any>>(r: Route, args: {
-        params: pito.Type<InferShare<Route>['Params']>,
-        payload: pito.Type<InferShare<Route>['Payload']>,
-        headers?: Record<string, string | string[]>,
-        key?: string
-    }): Promise<void>;
+    publish<Route extends Share<any, any, any, any, any>>(r: Route, ...args: PublishArgs<Route>[]): Promise<void>;
 }
 
 type InternalShareManager = {
@@ -63,16 +68,33 @@ function realTopicName(share: Share<any, any, any, any, any>, params: unknown) {
 }
 export const KafkaModule = FastifyModular('kafka')
     .option<KafkaModuleOption>()
-    .static('kafka:raw', 'auto', async ({ }, option): Promise<Kafka> => {
-        return new Kafka(option.kafka)
+    .static('kafka:raw', 'auto', async ({ }, option): Promise<KafkaJs> => {
+        return new KafkaJs(option.kafka)
     })
-    .static('kafka', 'auto', async ({ "kafka:raw": kafkaRaw }, option) => {
+    .static('kafka', 'auto', async ({ "kafka:raw": kafkaRaw }, option): Promise<Kafka> => {
+        const producer = kafkaRaw.producer(option.producer)
         return {
-            producer: kafkaRaw.producer(option.producer) as Producer,
+            producer,
             groupOptions: { [DEFAULT_GROUP_ID]: option.default, ...(option.groups ?? {}) } as Record<typeof DEFAULT_GROUP_ID, KafkaModuleGroupOption> & Record<string, KafkaModuleGroupOption>,
             consumers: {} as Record<string, Consumer>,
             groupTopics: {} as Record<string, (string | RegExp)[]>,
             regexMapping: [] as { gregex: RegExp, path: string }[],
+            async publish(r, ...args) {
+                const aggre: Record<string, Message[]> = {}
+                for (const arg of args) {
+                    const realTopic = realTopicName(r, arg.params)
+                    if (!Object.hasOwn(aggre, realTopic)) {
+                        aggre[realTopic] = []
+                    }
+                    aggre[realTopic].push({ value: JSON.stringify(arg.payload), key: arg.key, headers: arg.headers })
+                }
+                await Promise.all(Object.entries(aggre).map(async ([topic, messages]) => {
+                    await producer.send({
+                        topic,
+                        messages
+                    })
+                }))
+            }
         }
     })
     .dynamic("txKafka:raw",
@@ -89,18 +111,25 @@ export const KafkaModule = FastifyModular('kafka')
             }
         }
     )
-    .dynamic("txKafka", 5000, async ({ "txKafka:raw": txRaw }):Promise<TxKafka> => {
+    .dynamic("txKafka", 5000, async ({ "txKafka:raw": txRaw }): Promise<TxKafka> => {
         const raw = await txRaw
         return {
             raw,
-            async publish(r, args) {
-                const realTopic = realTopicName(r, args.params)
-                await raw.send({
-                    topic: realTopic,
-                    messages: [
-                        { value: JSON.stringify(args.payload), key: args.key, headers: args.headers }
-                    ]
-                })
+            async publish(r, ...args) {
+                const aggre: Record<string, Message[]> = {}
+                for (const arg of args) {
+                    const realTopic = realTopicName(r, arg.params)
+                    if (!Object.hasOwn(aggre, realTopic)) {
+                        aggre[realTopic] = []
+                    }
+                    aggre[realTopic].push({ value: JSON.stringify(arg.payload), key: arg.key, headers: arg.headers })
+                }
+                await Promise.all(Object.entries(aggre).map(async ([topic, messages]) => {
+                    await raw.send({
+                        topic,
+                        messages
+                    })
+                }))
             }
         }
 
