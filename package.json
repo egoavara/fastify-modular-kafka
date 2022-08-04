@@ -1,6 +1,6 @@
 {
   "name": "@fastify-modular/kafka",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "",
   "type": "module",
   "types": "./types/index.d.ts",
@@ -26,8 +26,8 @@
     "postversion": "npm publish",
     "prepack": "npm run build",
     "test": "tap --node-arg=--loader=ts-node/esm ./test/*.ts --test-ignore \".+\\.ignore\\.ts$\"",
-    "docker-up" : "docker compose -p fastify-modular-kafka -f ./test/docker-compose.yml up -d",
-    "docker-down" : "docker compose -p fastify-modular-kafka down -v"
+    "docker-up": "docker compose -p fastify-modular-kafka -f ./test/docker-compose.yml up -d",
+    "docker-down": "docker compose -p fastify-modular-kafka down -v"
   },
   "keywords": [
     "fastify",
