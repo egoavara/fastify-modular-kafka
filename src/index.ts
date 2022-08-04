@@ -246,7 +246,7 @@ export const KafkaModule = FastifyModular('kafka')
         if (fastify[SHARE_MANAGER]['kafka'].manager === undefined) { fastify[SHARE_MANAGER]['kafka'].manager = manager; kafkaManager = true }
         //
         fastify.addHook("onReady", async function () {
-            await manager.reload()
+            manager.reload()
         })
         fastify.addHook("onClose", async (fastify) => {
             await manager.stop()
