@@ -5,7 +5,7 @@ specifiers:
   '@types/node': ^18.0.5
   '@types/tap': ^15.0.7
   fastify: ^4.2.0
-  fastify-modular: ^0.9.0
+  fastify-modular: ^0.9.3
   kafkajs: ^2.1.0
   pito: ^1.0.0
   rimraf: ^3.0.2
@@ -18,7 +18,7 @@ devDependencies:
   '@types/node': 18.0.5
   '@types/tap': 15.0.7
   fastify: 4.2.1
-  fastify-modular: 0.9.0_qpxdxubqfbeaqrjdplubqyt3pa
+  fastify-modular: 0.9.3_qpxdxubqfbeaqrjdplubqyt3pa
   kafkajs: 2.1.0
   pito: 1.0.0
   rimraf: 3.0.2
@@ -774,8 +774,8 @@ packages:
     resolution: {integrity: sha512-qKRta6N7BWEFVlyonVY/V+BMLgFqktCUV0QjT259ekAIlbVrMaFnFLxJ4s/JPl4tou56S1BzPufI60bLe29fHA==}
     dev: true
 
-  /fastify-modular/0.9.0_qpxdxubqfbeaqrjdplubqyt3pa:
-    resolution: {integrity: sha512-3cNJ4Dh0BbYhFgF5HWefhTEb5StTX3p/hfTv/UsvBTJb5F0yiBLIscfF0+Kv26EpLjeEcoHFG/bkR/thH2hhAw==}
+  /fastify-modular/0.9.3_qpxdxubqfbeaqrjdplubqyt3pa:
+    resolution: {integrity: sha512-ALIha1KofkKdePNXjbuDm80SzdYwjgjAj6HZJeuwv6GywsmDhKU1HWFHPNH0t+MJIRjjOXC0jkWvWXjoel1hlw==}
     peerDependencies:
       '@fastify-modular/route': ^1.0.0
       fastify: ^4.0.0

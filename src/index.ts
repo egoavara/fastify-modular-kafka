@@ -36,7 +36,7 @@ export type Kafka = {
 
 }
 export type TxKafka = {
-    raw: Transaction
+    stored: Record<string, Message[]>
     publish<Route extends Share<any, any, any, any, any>>(r: Route, ...args: PublishArgs<Route>[]): Promise<void>;
 }
 
@@ -73,6 +73,7 @@ export const KafkaModule = FastifyModular('kafka')
     })
     .static('kafka', 'auto', async ({ "kafka:raw": kafkaRaw }, option): Promise<Kafka> => {
         const producer = kafkaRaw.producer(option.producer)
+        await producer.connect()
         return {
             producer,
             groupOptions: { [DEFAULT_GROUP_ID]: option.default, ...(option.groups ?? {}) } as Record<typeof DEFAULT_GROUP_ID, KafkaModuleGroupOption> & Record<string, KafkaModuleGroupOption>,
@@ -97,43 +98,35 @@ export const KafkaModule = FastifyModular('kafka')
             }
         }
     })
-    .dynamic("txKafka:raw",
-        5000,
-        async ({ "kafka:raw": kafkaRaw, kafka }) => {
-            await kafka.producer.connect()
-            return await kafka.producer.transaction() as Transaction
-        },
-        async ({ value, catched },) => {
-            if (catched === undefined) {
-                await value.commit()
-            } else {
-                await value.abort()
-            }
-        }
-    )
-    .dynamic("txKafka", 5000, async ({ "txKafka:raw": txRaw }): Promise<TxKafka> => {
-        const raw = await txRaw
-        return {
-            raw,
-            async publish(r, ...args) {
-                const aggre: Record<string, Message[]> = {}
-                for (const arg of args) {
-                    const realTopic = realTopicName(r, arg.params)
-                    if (!Object.hasOwn(aggre, realTopic)) {
-                        aggre[realTopic] = []
+    .dynamic("txKafka", 5000,
+        async ({ }): Promise<TxKafka> => {
+            const result: TxKafka = {
+                stored: {},
+                async publish(r, ...args) {
+                    for (const arg of args) {
+                        const realTopic = realTopicName(r, arg.params)
+                        if (!Object.hasOwn(this.stored, realTopic)) {
+                            this.stored[realTopic] = []
+                        }
+                        this.stored[realTopic].push({ value: JSON.stringify(arg.payload), key: arg.key, headers: arg.headers })
                     }
-                    aggre[realTopic].push({ value: JSON.stringify(arg.payload), key: arg.key, headers: arg.headers })
                 }
-                await Promise.all(Object.entries(aggre).map(async ([topic, messages]) => {
-                    await raw.send({
-                        topic,
-                        messages
-                    })
-                }))
             }
-        }
-
-    })
+            return result
+        },
+        async ({ value, catched }, { kafka }) => {
+            if (catched === undefined) {
+                value.stored
+                kafka.producer.sendBatch({
+                    topicMessages: Object.entries(value.stored).map(([k, v]) => {
+                        return {
+                            topic: k,
+                            messages: v
+                        }
+                    })
+                })
+            }
+        })
     .do(async ({ kafka, "kafka:raw": kafkaRaw }, option, { fastify, instance }) => {
         let initialized = false
         let defaultManager = false
@@ -195,17 +188,21 @@ export const KafkaModule = FastifyModular('kafka')
                 }
                 // =====
                 await kafka.producer.connect()
+
                 await Promise.all(Object.values(kafka.consumers).map(async v => {
                     await v.connect()
                 }))
+
                 await Promise.all(Object.entries(kafka.consumers).map(([gid, v]) => {
                     return v.subscribe({ topics: kafka.groupTopics[gid], ...(kafka.groupOptions[gid].subscribe) })
                 }))
+
                 await Promise.all(Object.entries(kafka.consumers).map(([gid, v]) => {
                     return v.run({
                         ...(kafka.groupOptions[gid].run),
                         async eachMessage(payload) {
                             const message = payload.message.value?.toString()
+                            
                             for (const { gregex, path } of kafka.regexMapping) {
                                 const matched = payload.topic.match(gregex)
                                 if (matched === null) {
@@ -214,7 +211,7 @@ export const KafkaModule = FastifyModular('kafka')
                                 const params = matched.groups ?? {}
                                 const response = await fastify.inject({
                                     method: "PATCH",
-                                    path: path,
+                                    url: path,
                                     headers: { 'content-type': 'application/json' },
                                     payload: JSON.stringify({
                                         topic: payload.topic,
@@ -237,10 +234,10 @@ export const KafkaModule = FastifyModular('kafka')
             },
             async stop() {
                 if (initialized) {
+                    initialized = false
                     await kafka.producer.disconnect()
                     await Promise.all(Object.values(kafka.consumers).map(v => v.disconnect()))
                 }
-                initialized = false
             }
         }
         if (fastify[SHARE_MANAGER][DEFAULT_SHARE_GROUP] === undefined) { fastify[SHARE_MANAGER][DEFAULT_SHARE_GROUP] = { route: [], } }
@@ -248,12 +245,10 @@ export const KafkaModule = FastifyModular('kafka')
         if (fastify[SHARE_MANAGER]['kafka'] === undefined) { fastify[SHARE_MANAGER]['kafka'] = { route: [], } }
         if (fastify[SHARE_MANAGER]['kafka'].manager === undefined) { fastify[SHARE_MANAGER]['kafka'].manager = manager; kafkaManager = true }
         //
-        let reload = Promise.resolve()
         fastify.addHook("onReady", async function () {
-            reload = manager.reload()
+            await manager.reload()
         })
         fastify.addHook("onClose", async (fastify) => {
-            await reload
             await manager.stop()
         })
     })

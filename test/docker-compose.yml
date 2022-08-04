@@ -1,0 +1,20 @@
+services:
+  infra-zookeeper-kafka:
+    image: bitnami/zookeeper:3.7
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    ports:
+      - 2181:2181
+
+  infra-kafka-n00:
+    image: bitnami/kafka:3.2
+    depends_on:
+      - infra-zookeeper-kafka
+    ports:
+      - 9092:9092
+    environment:
+      - KAFKA_BROKER_ID=1
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=infra-zookeeper-kafka:2181
+      - ALLOW_PLAINTEXT_LISTENER=yes
