@@ -116,8 +116,7 @@ export const KafkaModule = FastifyModular('kafka')
         },
         async ({ value, catched }, { kafka }) => {
             if (catched === undefined) {
-                value.stored
-                kafka.producer.sendBatch({
+                await kafka.producer.sendBatch({
                     topicMessages: Object.entries(value.stored).map(([k, v]) => {
                         return {
                             topic: k,
