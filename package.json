@@ -1,6 +1,6 @@
 {
   "name": "@fastify-modular/kafka",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "description": "",
   "type": "module",
   "types": "./types/index.d.ts",
@@ -23,7 +23,7 @@
   "scripts": {
     "build": "rimraf \"{cjs,esm,types}/**/*.{js,js.map,d.ts,d.ts.map}\" && tsc -b ./cjs/tsconfig.json ./esm/tsconfig.json ./types/tsconfig.json",
     "watch": "rimraf \"{cjs,esm,types}/**/*.{js,js.map,d.ts,d.ts.map}\" && tsc -b ./cjs/tsconfig.json ./esm/tsconfig.json ./types/tsconfig.json --watch",
-    "postversion": "npm publish",
+    "postversion": "npm publish --access=public",
     "prepack": "npm run build",
     "test": "tap --node-arg=--loader=ts-node/esm ./test/*.ts --test-ignore \".+\\.ignore\\.ts$\"",
     "docker-up": "docker compose -p fastify-modular-kafka -f ./test/docker-compose.yml up -d",

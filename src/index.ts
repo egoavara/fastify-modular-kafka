@@ -1,4 +1,4 @@
-import { InferShare, intoRegexTopic, Share } from "@fastify-modular/route"
+import { InferShare, Share } from "@fastify-modular/route"
 import { DEFAULT_SHARE_GROUP, FastifyModular, ObjectError, ShareManager, SHARE_MANAGER } from "fastify-modular"
 import type { Consumer, ConsumerConfig, ConsumerRunConfig, ConsumerSubscribeTopics, KafkaConfig, Message, Producer, ProducerConfig, Transaction } from "kafkajs"
 import { Kafka as KafkaJs } from "kafkajs"
@@ -6,6 +6,21 @@ import { pito } from "pito"
 
 const DEFAULT_GROUP_ID = "@fastify-modular/kafka"
 
+export function intoRegexTopic(topic: string, option?: { namedRegex?: boolean }): RegExp {
+    const namedRegex = option?.namedRegex ?? true
+    const parts = topic.split('.').map(v => {
+        if (v.startsWith(':')) {
+            if (namedRegex) {
+                return `(?<${v.substring(1)}>[a-zA-Z0-9\\-]+)`
+            } else {
+                return `([a-zA-Z0-9\\-]+)`
+            }
+        } else {
+            return v
+        }
+    })
+    return new RegExp('^' + parts.join('\\.') + '$')
+}
 
 export type KafkaModuleGroupOption = {
     consumer?: Omit<ConsumerConfig, 'groupId'>
