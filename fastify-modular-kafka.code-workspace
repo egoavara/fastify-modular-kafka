@@ -15,6 +15,6 @@
 	],
 	"settings": {
 		"typescript.preferences.importModuleSpecifierEnding": "js",
-		"typescript.tsdk": "[root]/node_modules/typescript/lib",
+		"typescript.tsdk": "[root]/.yarn/sdks/typescript/lib",
 	}
 }
