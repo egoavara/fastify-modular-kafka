@@ -4,7 +4,7 @@ import type { Consumer, ConsumerConfig, ConsumerRunConfig, ConsumerSubscribeTopi
 import { Kafka as KafkaJs } from "kafkajs"
 import { pito } from "pito"
 
-const DEFAULT_GROUP_ID = "@fastify-modular/kafka"
+const DEFAULT_GROUP_ID = "fastify-modular_kafka"
 
 export function intoRegexTopic(topic: string, option?: { namedRegex?: boolean }): RegExp {
     const namedRegex = option?.namedRegex ?? true
@@ -43,7 +43,7 @@ export type PublishArgs<Route extends Share<any, any, any, any, any>> = {
 }
 export type Kafka = {
     producer: Producer,
-    groupOptions: Record<typeof DEFAULT_GROUP_ID, KafkaModuleGroupOption> & Record<string, KafkaModuleGroupOption>,
+    groupOptions: Record<string, KafkaModuleGroupOption>,
     consumers: Record<string, Consumer>,
     groupTopics: Record<string, (string | RegExp)[]>,
     regexMapping: { gregex: RegExp, path: string }[],
@@ -91,10 +91,10 @@ export const KafkaModule = FastifyModular('kafka')
         await producer.connect()
         return {
             producer,
-            groupOptions: { [DEFAULT_GROUP_ID]: option.default, ...(option.groups ?? {}) } as Record<typeof DEFAULT_GROUP_ID, KafkaModuleGroupOption> & Record<string, KafkaModuleGroupOption>,
-            consumers: {} as Record<string, Consumer>,
-            groupTopics: {} as Record<string, (string | RegExp)[]>,
-            regexMapping: [] as { gregex: RegExp, path: string }[],
+            groupOptions: {},
+            consumers: {},
+            groupTopics: {},
+            regexMapping: [],
             async publish(r, ...args) {
                 const aggre: Record<string, Message[]> = {}
                 for (const arg of args) {
@@ -102,7 +102,7 @@ export const KafkaModule = FastifyModular('kafka')
                     if (!Object.hasOwn(aggre, realTopic)) {
                         aggre[realTopic] = []
                     }
-                    aggre[realTopic].push({ value: JSON.stringify(arg.payload), key: arg.key, headers: arg.headers })
+                    aggre[realTopic].push({ value: JSON.stringify(pito.wrap(r.payload, arg.payload)), key: arg.key, headers: arg.headers })
                 }
                 await Promise.all(Object.entries(aggre).map(async ([topic, messages]) => {
                     await producer.send({
@@ -216,7 +216,7 @@ export const KafkaModule = FastifyModular('kafka')
                         ...(kafka.groupOptions[gid].run),
                         async eachMessage(payload) {
                             const message = payload.message.value?.toString()
-                            
+
                             for (const { gregex, path } of kafka.regexMapping) {
                                 const matched = payload.topic.match(gregex)
                                 if (matched === null) {
