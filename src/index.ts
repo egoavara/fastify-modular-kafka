@@ -208,7 +208,9 @@ export const KafkaModule = FastifyModular('kafka')
                 }))
 
                 await Promise.all(Object.entries(kafka.consumers).map(([gid, v]) => {
-                    return v.subscribe({ topics: kafka.groupTopics[gid], ...(kafka.groupOptions[gid].subscribe) })
+                    return v.subscribe({ topics: kafka.groupTopics[gid], ...(kafka.groupOptions[gid].subscribe) }).then(()=>{
+                        fastify.log.info({ topics: kafka.groupTopics[gid], ...(kafka.groupOptions[gid].subscribe) }, "kafka subscribe")
+                    })
                 }))
 
                 await Promise.all(Object.entries(kafka.consumers).map(([gid, v]) => {
@@ -223,8 +225,8 @@ export const KafkaModule = FastifyModular('kafka')
                                     continue
                                 }
                                 const params = matched.groups ?? {}
-                                const response = await fastify.inject({
-                                    method: "PATCH",
+                                const messageInject = {
+                                    method: "PATCH" as "PATCH",
                                     url: path,
                                     headers: { 'content-type': 'application/json' },
                                     payload: JSON.stringify({
@@ -234,8 +236,11 @@ export const KafkaModule = FastifyModular('kafka')
                                         headers: payload.message.headers ?? {},
                                         key: payload.message.key?.toString()
                                     })
-                                })
+                                }
+                                fastify.log.info(messageInject, "kafka message")
+                                const response = await fastify.inject(messageInject)
                                 if (response.statusCode !== 204) {
+                                    fastify.log.warn(response, `kafka message share failed, cause`)
                                     throw new ObjectError({})
                                 }
                                 // 
